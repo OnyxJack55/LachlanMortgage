@@ -108,11 +108,7 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
             case 'email':
                 if (!value.trim()) return 'Email is required';
                 if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value)) {
-                    return 'Invalid email address';
-                }
-                if (!value.toLowerCase().endsWith('lachlanmortgage.com') && 
-                    !value.toLowerCase().endsWith('lachlanmortgage.com.au')) {
-                    return 'Email must be a Lachlan Mortgage email address';
+                    return 'Please enter a valid email address';
                 }
                 return undefined;
 

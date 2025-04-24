@@ -1,190 +1,113 @@
-import { AdminCredentials } from '../types/auth';
-import { ADMIN_USERS, STORAGE_KEYS, PASSWORD_REQUIREMENTS, SECURITY_CONFIG } from '../config/auth';
-import { createHash } from 'crypto';
+import { SECURE_CONFIG } from '../config/secure.config';
 
 interface User {
-  email: string;
-  name: string;
-  role: 'admin';
-}
-
-interface LoginAttempt {
-  count: number;
-  lastAttempt: number;
+    email: string;
+    role: string;
 }
 
 class AuthService {
-  private readonly TOKEN_KEY = STORAGE_KEYS.token;
-  private readonly USER_KEY = STORAGE_KEYS.user;
-  private readonly ATTEMPTS_KEY = 'login_attempts';
-  private loginAttempts: Map<string, LoginAttempt> = new Map();
+    private static TOKEN_KEY = 'auth_token';
+    private static USER_KEY = 'user_info';
 
-  constructor() {
-    // Load login attempts from storage
-    const savedAttempts = localStorage.getItem(this.ATTEMPTS_KEY);
-    if (savedAttempts) {
-      const attempts = JSON.parse(savedAttempts);
-      Object.entries(attempts).forEach(([email, attempt]) => {
-        this.loginAttempts.set(email, attempt as LoginAttempt);
-      });
-    }
-  }
-
-  private saveLoginAttempts(): void {
-    const attempts = Object.fromEntries(this.loginAttempts.entries());
-    localStorage.setItem(this.ATTEMPTS_KEY, JSON.stringify(attempts));
-  }
-
-  private hashPassword(password: string): string {
-    // In a real application, use a proper password hashing library like bcrypt
-    return createHash('sha256')
-      .update(password + SECURITY_CONFIG.passwordSalt)
-      .digest('hex');
-  }
-
-  private validatePassword(password: string): boolean {
-    if (password.length < PASSWORD_REQUIREMENTS.minLength) return false;
-    if (PASSWORD_REQUIREMENTS.requireUppercase && !/[A-Z]/.test(password)) return false;
-    if (PASSWORD_REQUIREMENTS.requireLowercase && !/[a-z]/.test(password)) return false;
-    if (PASSWORD_REQUIREMENTS.requireNumbers && !/[0-9]/.test(password)) return false;
-    if (PASSWORD_REQUIREMENTS.requireSpecialChars && 
-        !new RegExp(`[${PASSWORD_REQUIREMENTS.specialChars}]`).test(password)) return false;
-    return true;
-  }
-
-  private isAccountLocked(email: string): boolean {
-    const attempts = this.loginAttempts.get(email);
-    if (!attempts) return false;
-
-    const now = Date.now();
-    if (attempts.count >= SECURITY_CONFIG.maxLoginAttempts &&
-        now - attempts.lastAttempt < SECURITY_CONFIG.lockoutDuration) {
-      return true;
-    }
-
-    // Reset attempts if lockout period has passed
-    if (now - attempts.lastAttempt >= SECURITY_CONFIG.lockoutDuration) {
-      this.loginAttempts.delete(email);
-      this.saveLoginAttempts();
-    }
-
-    return false;
-  }
-
-  private recordLoginAttempt(email: string, success: boolean): void {
-    const now = Date.now();
-    const attempts = this.loginAttempts.get(email) || { count: 0, lastAttempt: now };
-
-    if (success) {
-      this.loginAttempts.delete(email);
-    } else {
-      attempts.count += 1;
-      attempts.lastAttempt = now;
-      this.loginAttempts.set(email, attempts);
-    }
-
-    this.saveLoginAttempts();
-  }
-
-  login(email: string, password: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Check for account lockout
-      if (this.isAccountLocked(email)) {
-        reject(new Error('Account is temporarily locked. Please try again later.'));
-        return;
-      }
-
-      // Simulate API call delay
-      setTimeout(() => {
-        const user = ADMIN_USERS.find(u => u.email === email);
-        
-        if (!user) {
-          this.recordLoginAttempt(email, false);
-          reject(new Error('Invalid credentials'));
-          return;
+    async login(email: string, password: string): Promise<boolean> {
+        try {
+            const adminUser = SECURE_CONFIG.adminUsers[0];
+            
+            // Case-insensitive email comparison, exact password match
+            if (email.toLowerCase() === adminUser.email.toLowerCase() && password === adminUser.password) {
+                // Store fake JWT token
+                const token = this.generateFakeToken();
+                localStorage.setItem(AuthService.TOKEN_KEY, token);
+                
+                // Store user info
+                const user: User = { email: adminUser.email, role: adminUser.role };
+                localStorage.setItem(AuthService.USER_KEY, JSON.stringify(user));
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Login error:', error);
+            return false;
         }
+    }
 
-        // In a real application, compare hashed passwords
-        if (password !== user.password) {
-          this.recordLoginAttempt(email, false);
-          reject(new Error('Invalid credentials'));
-          return;
+    logout(): void {
+        try {
+            // Clear all auth-related items
+            localStorage.removeItem(AuthService.TOKEN_KEY);
+            localStorage.removeItem(AuthService.USER_KEY);
+            // Clear any other potential stored data
+            sessionStorage.clear();
+            // Force reload to clear any in-memory state
+            window.location.href = '/admin/login';
+        } catch (error) {
+            console.error('Logout error:', error);
         }
+    }
 
-        // Successful login
-        this.recordLoginAttempt(email, true);
+    isAuthenticated(): boolean {
+        try {
+            const token = this.getToken();
+            if (!token) return false;
+            
+            // Check if user info exists
+            const user = this.getUser();
+            if (!user) return false;
+            
+            // Check token expiration
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload.exp && payload.exp < Date.now() / 1000) {
+                    this.logout(); // Clear expired session
+                    return false;
+                }
+            } catch (e) {
+                this.logout(); // Clear invalid token
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Authentication check error:', error);
+            return false;
+        }
+    }
 
-        // Generate token with expiration
-        const token = this.generateToken();
-        
-        // Store user info without sensitive data
-        const safeUser: User = {
-          email: user.email,
-          name: user.name,
-          role: user.role
+    getUser(): User | null {
+        try {
+            const userStr = localStorage.getItem(AuthService.USER_KEY);
+            return userStr ? JSON.parse(userStr) : null;
+        } catch (error) {
+            console.error('Get user error:', error);
+            return null;
+        }
+    }
+
+    getToken(): string | null {
+        try {
+            return localStorage.getItem(AuthService.TOKEN_KEY);
+        } catch (error) {
+            console.error('Get token error:', error);
+            return null;
+        }
+    }
+
+    private generateFakeToken(): string {
+        const header = { alg: 'HS256', typ: 'JWT' };
+        const payload = {
+            sub: '1234567890',
+            name: 'Admin User',
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (8 * 60 * 60) // 8 hours expiration
         };
 
-        localStorage.setItem(this.TOKEN_KEY, token);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(safeUser));
-        resolve();
-      }, 1000);
-    });
-  }
+        const encodedHeader = btoa(JSON.stringify(header));
+        const encodedPayload = btoa(JSON.stringify(payload));
+        const signature = btoa(SECURE_CONFIG.jwt.secret);
 
-  private generateToken(): string {
-    const payload = {
-      timestamp: Date.now(),
-      expires: Date.now() + SECURITY_CONFIG.tokenExpiration
-    };
-    
-    return createHash('sha256')
-      .update(JSON.stringify(payload) + SECURITY_CONFIG.tokenSecret)
-      .digest('hex');
-  }
-
-  logout(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
-    localStorage.removeItem(this.USER_KEY);
-  }
-
-  isAuthenticated(): boolean {
-    const token = localStorage.getItem(this.TOKEN_KEY);
-    if (!token) return false;
-
-    // In a real application, verify JWT token
-    // For now, we'll just check if the token exists
-    return true;
-  }
-
-  getUser(): User | null {
-    const userStr = localStorage.getItem(this.USER_KEY);
-    return userStr ? JSON.parse(userStr) : null;
-  }
-
-  getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
-  }
-
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    const user = this.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const adminUser = ADMIN_USERS.find(u => u.email === user.email);
-    if (!adminUser) throw new Error('User not found');
-
-    // Verify current password
-    if (currentPassword !== adminUser.password) {
-      throw new Error('Current password is incorrect');
+        return `${encodedHeader}.${encodedPayload}.${signature}`;
     }
-
-    // Validate new password
-    if (!this.validatePassword(newPassword)) {
-      throw new Error('New password does not meet requirements');
-    }
-
-    // Update password (in a real app, this would update the backend)
-    adminUser.password = newPassword;
-  }
 }
 
-export const authService = new AuthService(); 
+export default new AuthService(); 

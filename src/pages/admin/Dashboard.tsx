@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import authService from '../../services/authService';
 import StaffModal from '../../components/admin/StaffModal';
 import { useStaff } from '../../context/StaffContext';
 import type { StaffMember } from '../../context/StaffContext';
