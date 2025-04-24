@@ -1,0 +1,61 @@
+{
+  "business": {
+    "name": "[Business Name]",
+    "location": "[Business Location]",
+    "email": "[Business Email]",
+    "phone": "[Business Phone]",
+    "description": "[Business Description]"
+  },
+  "about": {
+    "title": "[About Title]",
+    "content": "[About Content]",
+    "mission": "[Mission Statement]",
+    "vision": "[Vision Statement]",
+    "experience": "[Years of Experience]",
+    "image": "[About Image URL]"
+  },
+  "services": {
+    "title": "[Services Title]",
+    "items": [
+      {
+        "title": "[Service 1 Title]",
+        "description": "[Service 1 Description]"
+      },
+      {
+        "title": "[Service 2 Title]",
+        "description": "[Service 2 Description]"
+      },
+      {
+        "title": "[Service 3 Title]",
+        "description": "[Service 3 Description]"
+      }
+    ]
+  },
+  "testimonials": {
+    "title": "[Testimonials Title]",
+    "items": [
+      {
+        "quote": "[Testimonial 1 Quote]",
+        "name": "[Testimonial 1 Name]",
+        "role": "[Testimonial 1 Role]",
+        "image": "[Testimonial 1 Image URL]"
+      },
+      {
+        "quote": "[Testimonial 2 Quote]",
+        "name": "[Testimonial 2 Name]",
+        "role": "[Testimonial 2 Role]",
+        "image": "[Testimonial 2 Image URL]"
+      },
+      {
+        "quote": "[Testimonial 3 Quote]",
+        "name": "[Testimonial 3 Name]",
+        "role": "[Testimonial 3 Role]",
+        "image": "[Testimonial 3 Image URL]"
+      }
+    ]
+  },
+  "contact": {
+    "title": "[Contact Title]",
+    "description": "[Contact Description]"
+  }
+} 
