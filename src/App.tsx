@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import Layout from './components/Layout';
 import Hero from './components/Hero';
 import BrokerSection from './components/BrokerSection';
@@ -7,6 +8,7 @@ import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { StaffProvider } from './context/StaffContext';
+import PageTitle from './components/PageTitle';
 import type { StaffMember } from './context/StaffContext';
 
 // Sample broker data - this will be replaced with actual data
@@ -58,6 +60,7 @@ const initialStaff: StaffMember[] = [
 const HomePage: React.FC = () => {
   return (
     <Layout>
+      <PageTitle title="Lachlan Mortgage" />
       <Hero businessName="Lachlan Mortgage" />
       <BrokerSection />
     </Layout>
@@ -66,22 +69,24 @@ const HomePage: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <StaffProvider initialStaff={initialStaff}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/admin/login" element={<Login />} />
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
-    </StaffProvider>
+    <HelmetProvider>
+      <StaffProvider initialStaff={initialStaff}>
+        <Router>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/admin/login" element={<Login />} />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </StaffProvider>
+    </HelmetProvider>
   );
 };
 

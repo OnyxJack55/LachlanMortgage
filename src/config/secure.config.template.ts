@@ -4,14 +4,14 @@
 export const SECURE_CONFIG = {
     adminUsers: [
         {
-            email: 'your-admin@lachlanmortgage.com.au',
-            password: 'your-secure-password',
+            email: 'admin@lachlanmortgage.com.au',
+            password: 'password',
             name: 'Admin Name',
             role: 'admin' as const
         }
     ],
     jwt: {
-        secret: 'your-jwt-secret-key',
+        secret: '91f28b1558a2926b78c41cf21775c12f',
         expiresIn: '8h'
     },
     security: {
