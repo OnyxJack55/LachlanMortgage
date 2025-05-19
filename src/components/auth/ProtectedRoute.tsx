@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import authService from '../../services/authService';
+import { subscribeToAuth } from '../../services/authService';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -8,9 +8,22 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const location = useLocation();
+    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<any>(null);
 
-    if (!authService.isAuthenticated()) {
-        // Redirect to login but remember where they were trying to go
+    useEffect(() => {
+        const unsubscribe = subscribeToAuth((firebaseUser) => {
+            setUser(firebaseUser);
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    }
+
+    if (!user) {
         return <Navigate to="/admin/login" state={{ from: location }} replace />;
     }
 

@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import * as staffService from '../services/staffService';
 
 export interface StaffMember {
+    id?: string; // Firestore document ID
     name: string;
     position: string;
     email: string;
@@ -10,9 +12,9 @@ export interface StaffMember {
 
 interface StaffContextType {
     staffMembers: StaffMember[];
-    addStaffMember: (staff: StaffMember) => void;
-    updateStaffMember: (index: number, staff: StaffMember) => void;
-    deleteStaffMember: (index: number) => void;
+    addStaffMember: (staff: Omit<StaffMember, 'id'>) => Promise<void>;
+    updateStaffMember: (id: string, staff: Omit<StaffMember, 'id'>) => Promise<void>;
+    deleteStaffMember: (id: string) => Promise<void>;
 }
 
 const STAFF_STORAGE_KEY = 'lachlanmortgage_staff';
@@ -29,32 +31,31 @@ export const useStaff = () => {
 
 interface StaffProviderProps {
     children: ReactNode;
-    initialStaff: StaffMember[];
+    initialStaff?: StaffMember[]; // Not used with Firestore
 }
 
-export const StaffProvider: React.FC<StaffProviderProps> = ({ children, initialStaff }) => {
-    // Initialize state from localStorage or use initialStaff
-    const [staffMembers, setStaffMembers] = useState<StaffMember[]>(() => {
-        const savedStaff = localStorage.getItem(STAFF_STORAGE_KEY);
-        return savedStaff ? JSON.parse(savedStaff) : initialStaff;
-    });
+export const StaffProvider: React.FC<StaffProviderProps> = ({ children }) => {
+    const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
-    // Save to localStorage whenever staffMembers changes
+    // Subscribe to Firestore staff collection for real-time updates
     useEffect(() => {
-        localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staffMembers));
-    }, [staffMembers]);
+        const unsubscribe = staffService.subscribeToStaff((staff) => {
+            setStaffMembers(staff as StaffMember[]);
+        });
+        return () => unsubscribe();
+    }, []);
 
-    const addStaffMember = (staff: StaffMember) => {
-        setStaffMembers(prev => [...prev, staff]);
-    };
+    const addStaffMember = useCallback(async (staff: Omit<StaffMember, 'id'>) => {
+        await staffService.addStaff(staff);
+    }, []);
 
-    const updateStaffMember = (index: number, staff: StaffMember) => {
-        setStaffMembers(prev => prev.map((s, i) => i === index ? staff : s));
-    };
+    const updateStaffMember = useCallback(async (id: string, staff: Omit<StaffMember, 'id'>) => {
+        await staffService.updateStaff(id, staff);
+    }, []);
 
-    const deleteStaffMember = (index: number) => {
-        setStaffMembers(prev => prev.filter((_, i) => i !== index));
-    };
+    const deleteStaffMember = useCallback(async (id: string) => {
+        await staffService.deleteStaff(id);
+    }, []);
 
     return (
         <StaffContext.Provider value={{

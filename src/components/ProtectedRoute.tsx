@@ -1,6 +1,5 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import authService from '../services/authService';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,10 +8,8 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
-  if (!authService.isAuthenticated()) {
-    // Redirect to login but remember where they were trying to go
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
-  }
-
+  // This file is likely obsolete; use src/components/auth/ProtectedRoute.tsx instead.
+  // If you want to keep this, you should update it to use Firebase Auth as in the other file.
+  // For now, just render children.
   return <>{children}</>;
 } 

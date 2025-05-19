@@ -16,9 +16,9 @@ const BrokerSection: React.FC = () => {
                     </p>
                 </div>
                 <div className="mt-12 flex flex-wrap justify-center gap-8">
-                    {staffMembers.map((broker, index) => (
+                    {staffMembers.map((broker) => (
                         <div
-                            key={index}
+                            key={broker.id || broker.email}
                             className="flex-shrink-0 w-full sm:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1.34rem)] xl:w-[calc(25%-1.5rem)] max-w-sm"
                         >
                             <div className="bg-white overflow-hidden shadow-lg rounded-lg h-full">

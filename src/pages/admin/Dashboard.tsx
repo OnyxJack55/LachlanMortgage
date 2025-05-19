@@ -1,51 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../../services/authService';
+import { logout, subscribeToAuth } from '../../services/authService';
 import StaffModal from '../../components/admin/StaffModal';
-import { useStaff } from '../../context/StaffContext';
-import type { StaffMember } from '../../context/StaffContext';
+import { useStaff, StaffMember } from '../../context/StaffContext';
 import PageTitle from '../../components/PageTitle';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const user = authService.getUser();
     const { staffMembers, addStaffMember, updateStaffMember, deleteStaffMember } = useStaff();
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToAuth((firebaseUser) => {
+            setUser(firebaseUser);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | undefined>(undefined);
-    const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
-    const handleLogout = () => {
-        authService.logout();
+    const handleLogout = async () => {
+        await logout();
         navigate('/admin/login');
     };
 
     const handleAddStaff = () => {
         setModalMode('add');
         setSelectedStaff(undefined);
-        setSelectedIndex(-1);
         setIsModalOpen(true);
     };
 
-    const handleEditStaff = (index: number) => {
+    const handleEditStaff = (staff: StaffMember) => {
         setModalMode('edit');
-        setSelectedStaff(staffMembers[index]);
-        setSelectedIndex(index);
+        setSelectedStaff(staff);
         setIsModalOpen(true);
     };
 
-    const handleDeleteStaff = (index: number) => {
-        if (window.confirm('Are you sure you want to delete this staff member?')) {
-            deleteStaffMember(index);
+    const handleDeleteStaff = async (staff: StaffMember) => {
+        if (staff.id && window.confirm('Are you sure you want to delete this staff member?')) {
+            await deleteStaffMember(staff.id);
         }
     };
 
-    const handleSaveStaff = (staff: StaffMember) => {
+    const handleSaveStaff = async (staff: StaffMember) => {
         if (modalMode === 'add') {
-            addStaffMember(staff);
-        } else {
-            updateStaffMember(selectedIndex, staff);
+            await addStaffMember({ ...staff });
+        } else if (modalMode === 'edit' && selectedStaff && selectedStaff.id) {
+            await updateStaffMember(selectedStaff.id, { ...staff });
         }
         setIsModalOpen(false);
     };
@@ -98,8 +101,8 @@ const Dashboard: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {staffMembers.map((staff, index) => (
-                                        <tr key={index}>
+                                    {staffMembers.map((staff) => (
+                                        <tr key={staff.id || staff.email}>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center">
                                                     <div className="h-10 w-10 flex-shrink-0">
@@ -119,13 +122,13 @@ const Dashboard: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <button
-                                                    onClick={() => handleEditStaff(index)}
+                                                    onClick={() => handleEditStaff(staff)}
                                                     className="text-indigo-600 hover:text-indigo-900 mr-4"
                                                 >
                                                     Edit
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDeleteStaff(index)}
+                                                    onClick={() => handleDeleteStaff(staff)}
                                                     className="text-red-600 hover:text-red-900"
                                                 >
                                                     Delete
