@@ -14,7 +14,7 @@ interface StaffContextType {
     staffMembers: StaffMember[];
     addStaffMember: (staff: Omit<StaffMember, 'id'>) => Promise<void>;
     updateStaffMember: (id: string, staff: Omit<StaffMember, 'id'>) => Promise<void>;
-    deleteStaffMember: (id: string) => Promise<void>;
+    deleteStaffMember: (id: string, imageUrl?: string) => Promise<void>;
 }
 
 const STAFF_STORAGE_KEY = 'lachlanmortgage_staff';
@@ -53,8 +53,8 @@ export const StaffProvider: React.FC<StaffProviderProps> = ({ children }) => {
         await staffService.updateStaff(id, staff);
     }, []);
 
-    const deleteStaffMember = useCallback(async (id: string) => {
-        await staffService.deleteStaff(id);
+    const deleteStaffMember = useCallback(async (id: string, imageUrl?: string) => {
+        await staffService.deleteStaff(id, imageUrl);
     }, []);
 
     return (

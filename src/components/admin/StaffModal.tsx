@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { storage } from '../../firebase';
+import { ref, uploadBytesResumable, getDownloadURL, ref as storageRef, deleteObject } from 'firebase/storage';
 
 interface StaffMember {
     name: string;
@@ -61,14 +63,19 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
         imageUrl: false
     });
 
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+
     useEffect(() => {
         if (staff && mode === 'edit') {
             setFormData(staff);
-            // Check if the position is in our predefined list
             if (!POSITIONS.includes(staff.position as typeof POSITIONS[number])) {
                 setShowCustomPosition(true);
                 setCustomPosition(staff.position);
             }
+            setUploadedImageUrl(null);
         } else {
             setFormData({
                 name: '',
@@ -79,8 +86,8 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
             });
             setCustomPosition('');
             setShowCustomPosition(false);
+            setUploadedImageUrl(null);
         }
-        // Reset errors and touched state
         setErrors({});
         setTouched({
             name: false,
@@ -89,6 +96,9 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
             phone: false,
             imageUrl: false
         });
+        setUploadError(null);
+        setUploadProgress(0);
+        setUploading(false);
     }, [staff, mode]);
 
     const validateField = (name: keyof StaffMember, value: string): string | undefined => {
@@ -177,21 +187,67 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
         setErrors(prev => ({ ...prev, [name]: error }));
     };
 
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setUploadError(null);
+        const file = e.dataTransfer.files[0];
+        await handleFileUpload(file);
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setUploadError(null);
+        const file = e.target.files?.[0];
+        if (file) {
+            await handleFileUpload(file);
+        }
+    };
+
+    const handleFileUpload = async (file: File) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/jpg'];
+        if (!allowedTypes.includes(file.type)) {
+            setUploadError('Only JPG, JPEG, PNG, GIF, and WEBP files are allowed.');
+            return;
+        }
+        setUploading(true);
+        setUploadProgress(0);
+        try {
+            const storageRef = ref(storage, `staff-images/${Date.now()}-${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(progress);
+                },
+                (error) => {
+                    setUploadError('Upload failed. Please try again.');
+                    setUploading(false);
+                },
+                async () => {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    setUploadedImageUrl(downloadURL);
+                    setFormData(prev => ({ ...prev, imageUrl: downloadURL }));
+                    setUploading(false);
+                }
+            );
+        } catch (err) {
+            setUploadError('Upload failed. Please try again.');
+            setUploading(false);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        // Validate all fields
         const newErrors: FormErrors = {};
         let hasErrors = false;
-
         (Object.keys(formData) as Array<keyof StaffMember>).forEach(field => {
+            // Allow imageUrl to be blank if uploadedImageUrl is set
+            if (field === 'imageUrl' && (formData.imageUrl || uploadedImageUrl)) return;
             const error = validateField(field, formData[field]);
             if (error) {
                 newErrors[field] = error;
                 hasErrors = true;
             }
         });
-
         setErrors(newErrors);
         setTouched({
             name: true,
@@ -200,10 +256,25 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
             phone: true,
             imageUrl: true
         });
-
         if (!hasErrors) {
-            onSave(formData);
+            onSave({ ...formData, imageUrl: uploadedImageUrl || formData.imageUrl });
         }
+    };
+
+    // Delete uploaded image if modal is cancelled before saving (add mode only)
+    const handleCancel = async () => {
+        if (mode === 'add' && uploadedImageUrl && uploadedImageUrl.includes('firebasestorage.googleapis.com')) {
+            try {
+                const match = uploadedImageUrl.match(/\/o\/(.*?)\?/);
+                if (match && match[1]) {
+                    const filePath = decodeURIComponent(match[1]);
+                    await deleteObject(storageRef(storage, filePath));
+                }
+            } catch (err) {
+                console.error('Failed to delete uploaded image on cancel:', err);
+            }
+        }
+        onClose();
     };
 
     if (!isOpen) return null;
@@ -333,16 +404,60 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff,
                                 onChange={handleChange}
                                 onBlur={handleBlur}
                                 className={getInputClassName('imageUrl')}
-                                required
+                                placeholder="Paste an image URL or use the upload below"
                             />
                             {errors.imageUrl && touched.imageUrl && (
                                 <p className="mt-1 text-sm text-red-600">{errors.imageUrl}</p>
+                            )}
+                            <div
+                                onDrop={handleDrop}
+                                onDragOver={e => e.preventDefault()}
+                                className="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-md text-center cursor-pointer bg-gray-50 hover:bg-gray-100"
+                            >
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif,image/webp,image/jpg"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                    id="fileUpload"
+                                />
+                                <label htmlFor="fileUpload" className="cursor-pointer block">
+                                    Drag and drop an image here, or <span className="text-indigo-600 underline">click to select a file</span><br/>
+                                    <span className="text-xs text-gray-500">(JPG, JPEG, PNG, GIF, WEBP only)</span>
+                                </label>
+                                {uploading && (
+                                    <div className="mt-2 text-sm text-gray-700">Uploading: {uploadProgress.toFixed(0)}%</div>
+                                )}
+                                {uploadError && (
+                                    <div className="mt-2 text-sm text-red-600">{uploadError}</div>
+                                )}
+                                {uploadedImageUrl && (
+                                    <div className="mt-2">
+                                        <img src={uploadedImageUrl} alt="Uploaded preview" className="mx-auto h-20 w-20 object-cover rounded-full border" />
+                                        <div className="text-xs text-green-700 mt-1">Upload successful!</div>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Preview section for main page aspect ratio */}
+                            {(formData.imageUrl || uploadedImageUrl) && (
+                                <div className="mt-6">
+                                    <div className="aspect-w-3 aspect-h-4 w-full max-w-xs mx-auto bg-white rounded-lg overflow-hidden border">
+                                        <img
+                                            src={uploadedImageUrl || formData.imageUrl}
+                                            alt="Main page preview"
+                                            className="w-full h-64 object-cover rounded-lg"
+                                        />
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-2 text-center">
+                                        Preview: This is how the image will appear on the main page. For best results, use a portrait photo.
+                                    </div>
+                                </div>
                             )}
                         </div>
                         <div className="flex justify-end space-x-3 mt-6">
                             <button
                                 type="button"
-                                onClick={onClose}
+                                onClick={handleCancel}
                                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 Cancel

@@ -70,7 +70,7 @@ const HomePage: React.FC = () => {
 const App: React.FC = () => {
   return (
     <HelmetProvider>
-      <StaffProvider initialStaff={initialStaff}>
+      <StaffProvider>
         <Router>
           <Routes>
             <Route path="/" element={<HomePage />} />

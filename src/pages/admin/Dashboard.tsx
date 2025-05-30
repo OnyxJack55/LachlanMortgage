@@ -40,7 +40,7 @@ const Dashboard: React.FC = () => {
 
     const handleDeleteStaff = async (staff: StaffMember) => {
         if (staff.id && window.confirm('Are you sure you want to delete this staff member?')) {
-            await deleteStaffMember(staff.id);
+            await deleteStaffMember(staff.id, staff.imageUrl);
         }
     };
 
